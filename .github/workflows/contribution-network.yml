@@ -43,9 +43,8 @@ jobs:
           git rm -rf .
           git clean -fdx
           
-          # Restore the SVG to the root of the branch
+          # Restore the SVG directly at the root of the output branch
           cp /tmp/contribution-network.svg contribution-network.svg
-          
           # Add, commit, and force-push to keep the branch clean
           git add contribution-network.svg
           git commit -m "chore: automate contribution network generation" || exit 0

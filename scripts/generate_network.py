@@ -154,18 +154,18 @@ def generate_svg(calendar_data, filepath, width=1200, height=600):
     
     svg.append('    <rect x="193" y="-11" width="14" height="14" rx="3" fill="#161b22" />')
     
-    svg.append('    <rect x="218" y="-11" width="14" height="14" rx="3" fill="#2d1b4e" stroke="#581c87" stroke-width="1"/>')
+    svg.append('    <rect x="218" y="-11" width="14" height="14" rx="3" fill="#161b22" />')
     svg.append('    ' + draw_star(225, -4, 2.0, "#C084FC"))
     
-    svg.append('    <rect x="243" y="-11" width="14" height="14" rx="3" fill="#2d1b4e" stroke="#581c87" stroke-width="1"/>')
+    svg.append('    <rect x="243" y="-11" width="14" height="14" rx="3" fill="#161b22" />')
     svg.append('    ' + draw_star(250, -4, 3.0, "#C084FC"))
     
-    svg.append('    <rect x="268" y="-11" width="14" height="14" rx="3" fill="#2d1b4e" stroke="#581c87" stroke-width="1"/>')
+    svg.append('    <rect x="268" y="-11" width="14" height="14" rx="3" fill="#161b22" />')
     svg.append('    ' + draw_star(275, -4, 4.0, "#C084FC"))
     
-    svg.append('    <rect x="293" y="-11" width="14" height="14" rx="3" fill="#2d1b4e" stroke="#581c87" stroke-width="1"/>')
+    svg.append('    <rect x="293" y="-11" width="14" height="14" rx="3" fill="#161b22" />')
     svg.append('    ' + draw_star(300, -4, 4.5, "#C084FC"))
-    svg.append('    ' + draw_star(300, -4, 1.8, "#D8B4FE"))
+    svg.append('    ' + draw_star(300, -4, 1.8, "#E9D5FF"))
     
     svg.append('    <text x="320" y="0" fill="#8b949e" font-size="12">More</text>')
     svg.append('  </g>')
@@ -182,17 +182,15 @@ def generate_svg(calendar_data, filepath, width=1200, height=600):
             last_month = month_str
     svg.append('  </g>')
 
-    # Grid - Inactive Cells
-    svg.append('  <g id="inactive-cells">')
+    # Grid - All Cells
+    svg.append('  <g id="grid-cells">')
     for cell in grid_cells:
-        if cell["count"] == 0:
-            svg.append(f'    <rect x="{cell["x"]:.1f}" y="{cell["y"]:.1f}" width="{cell_size}" height="{cell_size}" rx="3" fill="#161b22" />')
+        svg.append(f'    <rect x="{cell["x"]:.1f}" y="{cell["y"]:.1f}" width="{cell_size}" height="{cell_size}" rx="3" fill="#161b22" />')
     svg.append('  </g>')
 
     # Grid - Active Cells & Stars
     svg.append('  <g id="active-cells">')
     placed_top_labels = []
-    placed_bottom_labels = []
     
     for cell in active_cells:
         cx = cell["x"] + cell_size / 2
@@ -205,19 +203,15 @@ def generate_svg(calendar_data, filepath, width=1200, height=600):
         elif count <= 10: r = 4.0
         else: r = 4.5
         
-        # Draw dark purple box container
-        svg.append(f'    <rect class="active-cell" x="{cell["x"]:.1f}" y="{cell["y"]:.1f}" width="{cell_size}" height="{cell_size}" rx="3" fill="#2d1b4e" stroke="#581c87" stroke-width="1"/>')
-        
         # Subtle internal glow (bounds strictly within cell)
-        glow_r = r + 1.0
-        svg.append(f'    <circle cx="{cx:.1f}" cy="{cy:.1f}" r="{glow_r:.1f}" fill="#A855F7" fill-opacity="0.4"/>')
+        glow_r = r + 1.2
+        svg.append(f'    <circle cx="{cx:.1f}" cy="{cy:.1f}" r="{glow_r:.1f}" fill="#A855F7" fill-opacity="0.35"/>')
         
-        # Star
+        # Star Main Shape
         svg.append('    ' + draw_star(cx, cy, r, "#C084FC"))
         
-        # Brighter center for high contributions
-        if count >= 6:
-            svg.append('    ' + draw_star(cx, cy, r * 0.4, "#D8B4FE"))
+        # Brighter Center
+        svg.append('    ' + draw_star(cx, cy, r * 0.45, "#E9D5FF"))
             
         # Draw Labels with dynamic collision avoidance
         # Count label (Top)
@@ -235,25 +229,6 @@ def generate_svg(calendar_data, filepath, width=1200, height=600):
         
         svg.append(f'    <rect x="{cx - 10:.1f}" y="{ty - 9:.1f}" width="20" height="11" fill="#0d1117" rx="3"/>')
         svg.append(f'    <text x="{cx:.1f}" y="{ty:.1f}" fill="#C084FC" font-size="10" font-weight="bold" text-anchor="middle">{count}</text>')
-        
-        # Date label (Bottom)
-        dt = datetime.strptime(cell["date"], "%Y-%m-%d")
-        date_str = dt.strftime("%b %d")
-        
-        date_y_offset = cell_size + 10
-        while True:
-            ty_date = cell["y"] + date_y_offset
-            overlap = False
-            for p in placed_bottom_labels:
-                if abs(p["x"] - cx) < 28 and abs(p["y"] - ty_date) < 14:
-                    overlap = True
-                    break
-            if not overlap: break
-            date_y_offset += 14
-        placed_bottom_labels.append({"x": cx, "y": ty_date})
-        
-        svg.append(f'    <rect x="{cx - 16:.1f}" y="{ty_date - 8:.1f}" width="32" height="10" fill="#0d1117" rx="3"/>')
-        svg.append(f'    <text x="{cx:.1f}" y="{ty_date:.1f}" fill="#8b949e" font-size="9" text-anchor="middle">{date_str}</text>')
 
     svg.append('  </g>')
 

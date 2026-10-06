@@ -58,9 +58,10 @@ def fetch_contributions(username, token):
         print(f"Network Error: {e.reason}")
         return None
 
-def draw_star(cx, cy, r, fill="#C084FC"):
+def draw_star(cx, cy, r, fill="#C084FC", opacity=1.0):
     # 4-point sparkle confined strictly to [cx-r, cx+r], [cy-r, cy+r]
-    return f'<path class="star" d="M {cx:.1f} {cy-r:.1f} Q {cx:.1f} {cy:.1f} {cx+r:.1f} {cy:.1f} Q {cx:.1f} {cy:.1f} {cx:.1f} {cy+r:.1f} Q {cx:.1f} {cy:.1f} {cx-r:.1f} {cy:.1f} Q {cx:.1f} {cy:.1f} {cx:.1f} {cy-r:.1f} Z" fill="{fill}" />'
+    opacity_str = f' fill-opacity="{opacity:.2f}"' if opacity < 1.0 else ''
+    return f'<path class="star" d="M {cx:.1f} {cy-r:.1f} Q {cx:.1f} {cy:.1f} {cx+r:.1f} {cy:.1f} Q {cx:.1f} {cy:.1f} {cx:.1f} {cy+r:.1f} Q {cx:.1f} {cy:.1f} {cx-r:.1f} {cy:.1f} Q {cx:.1f} {cy:.1f} {cx:.1f} {cy-r:.1f} Z" fill="{fill}"{opacity_str} />'
 
 def generate_svg(calendar_data, filepath, width=1200, height=600):
     try:
@@ -155,17 +156,18 @@ def generate_svg(calendar_data, filepath, width=1200, height=600):
     svg.append('    <rect x="193" y="-11" width="14" height="14" rx="3" fill="#161b22" />')
     
     svg.append('    <rect x="218" y="-11" width="14" height="14" rx="3" fill="#161b22" />')
-    svg.append('    ' + draw_star(225, -4, 2.0, "#C084FC"))
+    svg.append('    ' + draw_star(225, -4, 2.5, "#C084FC"))
     
     svg.append('    <rect x="243" y="-11" width="14" height="14" rx="3" fill="#161b22" />')
-    svg.append('    ' + draw_star(250, -4, 3.0, "#C084FC"))
+    svg.append('    ' + draw_star(250, -4, 3.5, "#C084FC"))
     
     svg.append('    <rect x="268" y="-11" width="14" height="14" rx="3" fill="#161b22" />')
     svg.append('    ' + draw_star(275, -4, 4.0, "#C084FC"))
     
     svg.append('    <rect x="293" y="-11" width="14" height="14" rx="3" fill="#161b22" />')
+    svg.append('    ' + draw_star(300, -4, 4.5 * 1.4, "#A855F7", 0.4))
     svg.append('    ' + draw_star(300, -4, 4.5, "#C084FC"))
-    svg.append('    ' + draw_star(300, -4, 1.8, "#E9D5FF"))
+    svg.append('    ' + draw_star(300, -4, 2.0, "#F3E8FF"))
     
     svg.append('    <text x="320" y="0" fill="#8b949e" font-size="12">More</text>')
     svg.append('  </g>')
@@ -190,7 +192,6 @@ def generate_svg(calendar_data, filepath, width=1200, height=600):
 
     # Grid - Active Cells & Stars
     svg.append('  <g id="active-cells">')
-    placed_top_labels = []
     
     for cell in active_cells:
         cx = cell["x"] + cell_size / 2
@@ -198,37 +199,20 @@ def generate_svg(calendar_data, filepath, width=1200, height=600):
         count = cell["count"]
         
         # Star size logic based on count (max radius 4.5 ensures it remains completely inside 14x14 cell)
-        if count <= 2: r = 2.0
-        elif count <= 5: r = 3.0
+        if count <= 2: r = 2.5
+        elif count <= 5: r = 3.5
         elif count <= 10: r = 4.0
         else: r = 4.5
         
-        # Subtle internal glow (bounds strictly within cell)
-        glow_r = r + 1.2
-        svg.append(f'    <circle cx="{cx:.1f}" cy="{cy:.1f}" r="{glow_r:.1f}" fill="#A855F7" fill-opacity="0.35"/>')
+        # Glow (a larger, softer star shape, strictly bound inside the cell)
+        glow_r = r * 1.4
+        svg.append('    ' + draw_star(cx, cy, glow_r, "#A855F7", 0.4))
         
         # Star Main Shape
         svg.append('    ' + draw_star(cx, cy, r, "#C084FC"))
         
-        # Brighter Center
-        svg.append('    ' + draw_star(cx, cy, r * 0.45, "#E9D5FF"))
-            
-        # Draw Labels with dynamic collision avoidance
-        # Count label (Top)
-        label_y_offset = -6
-        while True:
-            ty = cell["y"] + label_y_offset
-            overlap = False
-            for p in placed_top_labels:
-                if abs(p["x"] - cx) < 20 and abs(p["y"] - ty) < 14:
-                    overlap = True
-                    break
-            if not overlap: break
-            label_y_offset -= 14
-        placed_top_labels.append({"x": cx, "y": ty})
-        
-        svg.append(f'    <rect x="{cx - 10:.1f}" y="{ty - 9:.1f}" width="20" height="11" fill="#0d1117" rx="3"/>')
-        svg.append(f'    <text x="{cx:.1f}" y="{ty:.1f}" fill="#C084FC" font-size="10" font-weight="bold" text-anchor="middle">{count}</text>')
+        # Brighter Center Core
+        svg.append('    ' + draw_star(cx, cy, r * 0.45, "#F3E8FF"))
 
     svg.append('  </g>')
 

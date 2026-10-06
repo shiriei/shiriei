@@ -108,12 +108,15 @@ def generate_svg(calendar_data, filepath, width=1200, height=600):
 
     # Prepare nodes
     active_nodes = []
+    inactive_nodes = []
     month_labels = []
     last_month = None
     
     total_days = len(all_days)
     for i, d in enumerate(all_days):
         x = 100 + (i / max(1, total_days - 1)) * 1000
+        # Wavy chronological timeline that occupies vertical space (170 to 450)
+        y = 310 + math.sin(i / 15.0) * 100 + math.cos(i / 7.0) * 40
         
         # Add month label
         month_str = d["date"][5:7]
@@ -121,7 +124,6 @@ def generate_svg(calendar_data, filepath, width=1200, height=600):
             try:
                 dt = datetime.strptime(d["date"], "%Y-%m-%d")
                 month_name = dt.strftime("%b")
-                # Avoid overlapping labels at the very start
                 if x > 120 or not month_labels:
                     month_labels.append({"x": x, "label": month_name})
             except ValueError:
@@ -129,8 +131,6 @@ def generate_svg(calendar_data, filepath, width=1200, height=600):
             last_month = month_str
             
         if d["count"] > 0:
-            # Deterministic wave layout ensuring organic chronological flow
-            y = 280 + math.sin(i / 20.0) * 60 + math.cos(i / 7.0) * 30
             active_nodes.append({
                 "index": i,
                 "x": x,
@@ -138,8 +138,13 @@ def generate_svg(calendar_data, filepath, width=1200, height=600):
                 "count": d["count"],
                 "date": d["date"]
             })
+        else:
+            inactive_nodes.append({
+                "x": x,
+                "y": y
+            })
 
-    # Prepare edges
+    # Prepare edges (thin lines between chronologically active days)
     edges = []
     for i in range(len(active_nodes)):
         idx_current = active_nodes[i]["index"]
@@ -172,32 +177,50 @@ def generate_svg(calendar_data, filepath, width=1200, height=600):
     svg.append('  <g transform="translate(800, 70)">')
     svg.append('    <text x="0" y="0" fill="#8b949e" font-size="14">Contribution intensity</text>')
     svg.append('    <text x="160" y="0" fill="#8b949e" font-size="12">Less</text>')
-    svg.append('    <circle cx="200" cy="-4" r="3" fill="#FF9BCE" fill-opacity="0.3"/>')
-    svg.append('    <circle cx="220" cy="-4" r="4.5" fill="#FF9BCE" fill-opacity="0.5"/>')
-    svg.append('    <circle cx="240" cy="-4" r="6" fill="#FF9BCE" fill-opacity="0.7"/>')
-    svg.append('    <circle cx="260" cy="-4" r="7.5" fill="#FF9BCE" fill-opacity="0.9"/>')
-    svg.append('    <circle cx="280" cy="-4" r="9" fill="#FF9BCE" fill-opacity="1.0"/>')
+    svg.append('    <circle cx="200" cy="-4" r="5" fill="#FF9BCE" fill-opacity="0.4"/>')
+    svg.append('    <circle cx="225" cy="-4" r="6.5" fill="#FF9BCE" fill-opacity="0.6"/>')
+    svg.append('    <circle cx="250" cy="-4" r="8" fill="#FF9BCE" fill-opacity="0.8"/>')
+    svg.append('    <circle cx="275" cy="-4" r="10" fill="#FF9BCE" fill-opacity="1.0"/>')
     svg.append('    <text x="300" y="0" fill="#8b949e" font-size="12">More</text>')
     svg.append('  </g>')
     
     # Month Labels
     for m in month_labels:
-        svg.append(f'  <text x="{m["x"]:.1f}" y="150" fill="#8b949e" font-size="12" text-anchor="middle">{m["label"]}</text>')
+        svg.append(f'  <text x="{m["x"]:.1f}" y="130" fill="#8b949e" font-size="12" text-anchor="middle">{m["label"]}</text>')
+
+    # Inactive Nodes (subtle background dots)
+    svg.append('  <g id="inactive-nodes">')
+    for n in inactive_nodes:
+        svg.append(f'    <circle cx="{n["x"]:.1f}" cy="{n["y"]:.1f}" r="1.5" fill="#30363d" />')
+    svg.append('  </g>')
 
     # Network Edges
-    svg.append('  <g>')
+    svg.append('  <g id="edges">')
     for u_idx, v_idx in edges:
         u = active_nodes[u_idx]
         v = active_nodes[v_idx]
-        svg.append(f'    <line x1="{u["x"]:.1f}" y1="{u["y"]:.1f}" x2="{v["x"]:.1f}" y2="{v["y"]:.1f}" stroke="#FF9BCE" stroke-width="1" stroke-opacity="0.2" />')
+        svg.append(f'    <line x1="{u["x"]:.1f}" y1="{u["y"]:.1f}" x2="{v["x"]:.1f}" y2="{v["y"]:.1f}" stroke="#FF9BCE" stroke-width="1.5" stroke-opacity="0.25" />')
+    svg.append('  </g>')
 
     # Network Nodes
+    svg.append('  <g id="active-nodes">')
     for n in active_nodes:
-        r = min(12.0, 3.0 + math.log1p(n["count"]) * 2.0)
-        opacity = min(1.0, 0.3 + math.log1p(n["count"]) * 0.2)
-        svg.append(f'    <circle class="node" cx="{n["x"]:.1f}" cy="{n["y"]:.1f}" r="{r:.1f}" fill="#FF9BCE" fill-opacity="{opacity:.2f}">')
-        svg.append(f'      <title>Date: {n["date"]}&#10;Contributions: {n["count"]}</title>')
-        svg.append('    </circle>')
+        r = 5.0 + math.log1p(n["count"]) * 3.0
+        opacity = min(1.0, 0.4 + math.log1p(n["count"]) * 0.2)
+        
+        # Draw node
+        svg.append(f'    <circle class="node" cx="{n["x"]:.1f}" cy="{n["y"]:.1f}" r="{r:.1f}" fill="#FF9BCE" fill-opacity="{opacity:.2f}"></circle>')
+        
+        # Text label for count
+        svg.append(f'    <text x="{n["x"]:.1f}" y="{n["y"] - r - 4:.1f}" fill="#ffffff" font-size="12" font-weight="bold" text-anchor="middle">{n["count"]}</text>')
+        
+        # Text label for date
+        try:
+            dt = datetime.strptime(n["date"], "%Y-%m-%d")
+            date_str = dt.strftime("%b %d")
+        except ValueError:
+            date_str = n["date"][5:]
+        svg.append(f'    <text x="{n["x"]:.1f}" y="{n["y"] + r + 12:.1f}" fill="#8b949e" font-size="10" text-anchor="middle">{date_str}</text>')
     svg.append('  </g>')
 
     # Summary Statistics

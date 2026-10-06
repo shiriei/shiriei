@@ -94,7 +94,7 @@ Linux, and web technologies**, while gradually diving deeper into
 
 <p align="center">
   <img
-    src="https://raw.githubusercontent.com/shiriei/shiriei/output/contribution-network.svg"
+    src="https://github.com/shiriei/shiriei/raw/refs/heads/output/contribution-network.svg"
     width="100%"
     alt="GitHub Contribution Network"
   />

@@ -58,9 +58,9 @@ def fetch_contributions(username, token):
         print(f"Network Error: {e.reason}")
         return None
 
-def draw_star(cx, cy, r, opacity=1.0):
-    # Generates an elegant 4-point sparkle using SVG Bezier curves (Q)
-    return f'<path d="M {cx:.1f} {cy-r:.1f} Q {cx:.1f} {cy:.1f} {cx+r:.1f} {cy:.1f} Q {cx:.1f} {cy:.1f} {cx:.1f} {cy+r:.1f} Q {cx:.1f} {cy:.1f} {cx-r:.1f} {cy:.1f} Q {cx:.1f} {cy:.1f} {cx:.1f} {cy-r:.1f} Z" fill="#39FFDF" fill-opacity="{opacity:.2f}" />'
+def draw_star(cx, cy, r, fill="#C084FC"):
+    # 4-point sparkle confined strictly to [cx-r, cx+r], [cy-r, cy+r]
+    return f'<path class="star" d="M {cx:.1f} {cy-r:.1f} Q {cx:.1f} {cy:.1f} {cx+r:.1f} {cy:.1f} Q {cx:.1f} {cy:.1f} {cx:.1f} {cy+r:.1f} Q {cx:.1f} {cy:.1f} {cx-r:.1f} {cy:.1f} Q {cx:.1f} {cy:.1f} {cx:.1f} {cy-r:.1f} Z" fill="{fill}" />'
 
 def generate_svg(calendar_data, filepath, width=1200, height=600):
     try:
@@ -72,35 +72,59 @@ def generate_svg(calendar_data, filepath, width=1200, height=600):
     weeks = calendar_data.get("weeks", [])
     total_contributions = calendar_data.get("totalContributions", 0)
     
-    all_days = []
-    for week in weeks:
-        for day in week.get("contributionDays", []):
-            all_days.append({
-                "date": day["date"],
-                "count": day["contributionCount"]
-            })
-            
-    if not all_days:
-        print("No days found in calendar.")
-        return
-        
     # Calculate Statistics
     longest_streak = 0
     current_streak = 0
     month_counts = defaultdict(int)
+    active_days = 0
     
-    for d in all_days:
-        if d["count"] > 0:
-            current_streak += 1
-            longest_streak = max(longest_streak, current_streak)
-        else:
-            current_streak = 0
+    # Grid Layout Parameters
+    cell_size = 14
+    step = 18
+    # Center grid horizontally
+    grid_width = len(weeks) * step
+    start_x = (width - grid_width) / 2
+    start_y = 220
+    
+    grid_cells = []
+    active_cells = []
+    
+    for col, week in enumerate(weeks):
+        x = start_x + col * step
+        for day in week.get("contributionDays", []):
+            date_str = day["date"]
+            count = day["contributionCount"]
             
-        month = d["date"][0:7]
-        month_counts[month] += d["count"]
+            # Use real datetime to map row correctly (0=Mon, 6=Sun in Python)
+            # Standard GitHub calendar aligns Sunday to row 0.
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
+            github_weekday = (dt.weekday() + 1) % 7
+            y = start_y + github_weekday * step
+            
+            cell = {
+                "x": x,
+                "y": y,
+                "date": date_str,
+                "count": count
+            }
+            grid_cells.append(cell)
+            
+            # Stats updates
+            if count > 0:
+                current_streak += 1
+                longest_streak = max(longest_streak, current_streak)
+                active_days += 1
+                active_cells.append(cell)
+            else:
+                current_streak = 0
+                
+            month = date_str[0:7]
+            month_counts[month] += count
+
+    if not grid_cells:
+        print("No days found in calendar.")
+        return
         
-    active_days = sum(1 for d in all_days if d["count"] > 0)
-    
     most_active_month = "N/A"
     if month_counts:
         best_month_str = max(month_counts.items(), key=lambda x: x[1])[0]
@@ -109,65 +133,6 @@ def generate_svg(calendar_data, filepath, width=1200, height=600):
             most_active_month = dt.strftime("%b %Y")
         except ValueError:
             most_active_month = best_month_str
-
-    # Prepare nodes for active contribution stars
-    active_nodes = []
-    month_labels = []
-    last_month = None
-    
-    total_days = len(all_days)
-    for i, d in enumerate(all_days):
-        x = 100 + (i / max(1, total_days - 1)) * 1000
-        # Underlying timeline base for vertical scattering
-        base_y = 260 + math.sin(i / 15.0) * 80 + math.cos(i / 7.0) * 30
-        
-        # Record month label positions
-        month_str = d["date"][5:7]
-        if month_str != last_month:
-            try:
-                dt = datetime.strptime(d["date"], "%Y-%m-%d")
-                month_name = dt.strftime("%b")
-                if x > 120 or not month_labels:
-                    month_labels.append({"x": x, "label": month_name})
-            except ValueError:
-                pass
-            last_month = month_str
-            
-        if d["count"] > 0:
-            # Find a safe vertical position to prevent star overlap
-            lane_offsets = [0, 50, -50, 100, -100, 150, -150]
-            safe_y = base_y
-            for offset in lane_offsets:
-                test_y = base_y + offset
-                overlap = False
-                for p in reversed(active_nodes[-15:]):
-                    dx = abs(p["x"] - x)
-                    dy = abs(p["y"] - test_y)
-                    # Vertical separation needed for text labels
-                    if dx < 40 and dy < 60:
-                        overlap = True
-                        break
-                if not overlap:
-                    safe_y = test_y
-                    break
-                    
-            active_nodes.append({
-                "index": i,
-                "x": x,
-                "y": safe_y,
-                "count": d["count"],
-                "date": d["date"]
-            })
-
-    # Prepare deterministic decorative background stars
-    background_stars = []
-    for i in range(70):
-        # Pseudo-random but deterministic properties
-        bx = 50 + ((i * 137) % 1100)
-        by = 120 + ((i * 93) % 300)
-        br = 0.5 + ((i * 17) % 2)
-        opacity = 0.05 + ((i * 11) % 20) / 100.0
-        background_stars.append(f'<circle cx="{bx:.1f}" cy="{by:.1f}" r="{br:.1f}" fill="#39FFDF" fill-opacity="{opacity:.2f}"/>')
 
     # Build SVG
     svg = [
@@ -186,61 +151,110 @@ def generate_svg(calendar_data, filepath, width=1200, height=600):
     svg.append('  <g transform="translate(800, 70)">')
     svg.append('    <text x="0" y="0" fill="#8b949e" font-size="14">Contribution intensity</text>')
     svg.append('    <text x="160" y="0" fill="#8b949e" font-size="12">Less</text>')
-    svg.append('    <circle cx="200" cy="-4" r="2" fill="#39FFDF" fill-opacity="0.3"/>')
-    svg.append('    ' + draw_star(225, -4, 4, 0.5))
-    svg.append('    ' + draw_star(250, -4, 6, 0.7))
-    svg.append('    ' + draw_star(275, -4, 8, 0.9))
-    svg.append('    ' + draw_star(300, -4, 10, 1.0))
+    
+    svg.append('    <rect x="193" y="-11" width="14" height="14" rx="3" fill="#161b22" />')
+    
+    svg.append('    <rect x="218" y="-11" width="14" height="14" rx="3" fill="#2d1b4e" stroke="#581c87" stroke-width="1"/>')
+    svg.append('    ' + draw_star(225, -4, 2.0, "#C084FC"))
+    
+    svg.append('    <rect x="243" y="-11" width="14" height="14" rx="3" fill="#2d1b4e" stroke="#581c87" stroke-width="1"/>')
+    svg.append('    ' + draw_star(250, -4, 3.0, "#C084FC"))
+    
+    svg.append('    <rect x="268" y="-11" width="14" height="14" rx="3" fill="#2d1b4e" stroke="#581c87" stroke-width="1"/>')
+    svg.append('    ' + draw_star(275, -4, 4.0, "#C084FC"))
+    
+    svg.append('    <rect x="293" y="-11" width="14" height="14" rx="3" fill="#2d1b4e" stroke="#581c87" stroke-width="1"/>')
+    svg.append('    ' + draw_star(300, -4, 4.5, "#C084FC"))
+    svg.append('    ' + draw_star(300, -4, 1.8, "#D8B4FE"))
+    
     svg.append('    <text x="320" y="0" fill="#8b949e" font-size="12">More</text>')
     svg.append('  </g>')
 
-    # Decorative Background
-    svg.append('  <g id="background-stars">')
-    for star_str in background_stars:
-        svg.append(f'    {star_str}')
-    svg.append('  </g>')
-    
-    # Month Timeline (Subtle timeline at bottom)
-    svg.append('  <g id="timeline">')
-    svg.append('    <line x1="100" y1="440" x2="1100" y2="440" stroke="#30363d" stroke-width="1" />')
-    for m in month_labels:
-        svg.append(f'  <text x="{m["x"]:.1f}" y="458" fill="#8b949e" font-size="12" text-anchor="middle">{m["label"]}</text>')
+    # Month Labels (Top of grid)
+    svg.append('  <g id="month-labels">')
+    last_month = None
+    for cell in grid_cells:
+        month_str = cell["date"][5:7]
+        if month_str != last_month:
+            dt = datetime.strptime(cell["date"], "%Y-%m-%d")
+            month_name = dt.strftime("%b")
+            svg.append(f'    <text x="{cell["x"]:.1f}" y="{start_y - 15}" fill="#8b949e" font-size="12">{month_name}</text>')
+            last_month = month_str
     svg.append('  </g>')
 
-    # Primary Contribution Stars
-    svg.append('  <g id="contribution-stars">')
-    for n in active_nodes:
-        count = n["count"]
+    # Grid - Inactive Cells
+    svg.append('  <g id="inactive-cells">')
+    for cell in grid_cells:
+        if cell["count"] == 0:
+            svg.append(f'    <rect x="{cell["x"]:.1f}" y="{cell["y"]:.1f}" width="{cell_size}" height="{cell_size}" rx="3" fill="#161b22" />')
+    svg.append('  </g>')
+
+    # Grid - Active Cells & Stars
+    svg.append('  <g id="active-cells">')
+    placed_top_labels = []
+    placed_bottom_labels = []
+    
+    for cell in active_cells:
+        cx = cell["x"] + cell_size / 2
+        cy = cell["y"] + cell_size / 2
+        count = cell["count"]
         
-        # Scaling logic: smaller stars for 1-5, escalating rapidly for 11+
-        if count <= 2:
-            r = 5.0 + count * 0.5
-        elif count <= 5:
-            r = 7.0 + (count - 2) * 1.0
-        elif count <= 10:
-            r = 10.0 + (count - 5) * 1.0
-        else:
-            r = 15.0 + math.log1p(count - 10) * 3.0
+        # Star size logic based on count (max radius 4.5 ensures it remains completely inside 14x14 cell)
+        if count <= 2: r = 2.0
+        elif count <= 5: r = 3.0
+        elif count <= 10: r = 4.0
+        else: r = 4.5
+        
+        # Draw dark purple box container
+        svg.append(f'    <rect class="active-cell" x="{cell["x"]:.1f}" y="{cell["y"]:.1f}" width="{cell_size}" height="{cell_size}" rx="3" fill="#2d1b4e" stroke="#581c87" stroke-width="1"/>')
+        
+        # Subtle internal glow (bounds strictly within cell)
+        glow_r = r + 1.0
+        svg.append(f'    <circle cx="{cx:.1f}" cy="{cy:.1f}" r="{glow_r:.1f}" fill="#A855F7" fill-opacity="0.4"/>')
+        
+        # Star
+        svg.append('    ' + draw_star(cx, cy, r, "#C084FC"))
+        
+        # Brighter center for high contributions
+        if count >= 6:
+            svg.append('    ' + draw_star(cx, cy, r * 0.4, "#D8B4FE"))
             
-        opacity = min(1.0, 0.4 + math.log1p(count) * 0.2)
-        glow_r = r * 1.6
+        # Draw Labels with dynamic collision avoidance
+        # Count label (Top)
+        label_y_offset = -6
+        while True:
+            ty = cell["y"] + label_y_offset
+            overlap = False
+            for p in placed_top_labels:
+                if abs(p["x"] - cx) < 20 and abs(p["y"] - ty) < 14:
+                    overlap = True
+                    break
+            if not overlap: break
+            label_y_offset -= 14
+        placed_top_labels.append({"x": cx, "y": ty})
         
-        # Subtle radial glow behind the star
-        svg.append(f'    <circle cx="{n["x"]:.1f}" cy="{n["y"]:.1f}" r="{glow_r:.1f}" fill="#39FFDF" fill-opacity="{opacity * 0.15:.2f}"/>')
+        svg.append(f'    <rect x="{cx - 10:.1f}" y="{ty - 9:.1f}" width="20" height="11" fill="#0d1117" rx="3"/>')
+        svg.append(f'    <text x="{cx:.1f}" y="{ty:.1f}" fill="#C084FC" font-size="10" font-weight="bold" text-anchor="middle">{count}</text>')
         
-        # The star shape itself
-        svg.append('    ' + draw_star(n["x"], n["y"], r, opacity))
+        # Date label (Bottom)
+        dt = datetime.strptime(cell["date"], "%Y-%m-%d")
+        date_str = dt.strftime("%b %d")
         
-        # Text label for exact contribution count
-        svg.append(f'    <text x="{n["x"]:.1f}" y="{n["y"] - r - 6:.1f}" fill="#ffffff" font-size="12" font-weight="bold" text-anchor="middle">{count}</text>')
+        date_y_offset = cell_size + 10
+        while True:
+            ty_date = cell["y"] + date_y_offset
+            overlap = False
+            for p in placed_bottom_labels:
+                if abs(p["x"] - cx) < 28 and abs(p["y"] - ty_date) < 14:
+                    overlap = True
+                    break
+            if not overlap: break
+            date_y_offset += 14
+        placed_bottom_labels.append({"x": cx, "y": ty_date})
         
-        # Text label for exact date
-        try:
-            dt = datetime.strptime(n["date"], "%Y-%m-%d")
-            date_str = dt.strftime("%b %d")
-        except ValueError:
-            date_str = n["date"][5:]
-        svg.append(f'    <text x="{n["x"]:.1f}" y="{n["y"] + r + 14:.1f}" fill="#8b949e" font-size="10" text-anchor="middle">{date_str}</text>')
+        svg.append(f'    <rect x="{cx - 16:.1f}" y="{ty_date - 8:.1f}" width="32" height="10" fill="#0d1117" rx="3"/>')
+        svg.append(f'    <text x="{cx:.1f}" y="{ty_date:.1f}" fill="#8b949e" font-size="9" text-anchor="middle">{date_str}</text>')
+
     svg.append('  </g>')
 
     # Summary Statistics Cards
@@ -259,8 +273,7 @@ def generate_svg(calendar_data, filepath, width=1200, height=600):
         cx = 100 + idx * (card_width + spacing)
         svg.append(f'  <rect x="{cx}" y="{stats_y}" width="{card_width}" height="{card_height}" rx="8" fill="#161b22" stroke="#30363d"/>')
         svg.append(f'  <text x="{cx + card_width/2}" y="{stats_y + 30}" fill="#8b949e" font-size="14" text-anchor="middle">{title}</text>')
-        # Teal accent color instead of pink
-        svg.append(f'  <text x="{cx + card_width/2}" y="{stats_y + 60}" fill="#39FFDF" font-size="22" font-weight="bold" text-anchor="middle">{value}</text>')
+        svg.append(f'  <text x="{cx + card_width/2}" y="{stats_y + 60}" fill="#C084FC" font-size="22" font-weight="bold" text-anchor="middle">{value}</text>')
 
     svg.append('</svg>')
     

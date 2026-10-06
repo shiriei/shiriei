@@ -156,18 +156,18 @@ def generate_svg(calendar_data, filepath, width=1200, height=600):
     svg.append('    <rect x="193" y="-11" width="14" height="14" rx="3" fill="#161b22" />')
     
     svg.append('    <rect x="218" y="-11" width="14" height="14" rx="3" fill="#161b22" />')
-    svg.append('    ' + draw_star(225, -4, 2.5, "#C084FC"))
+    svg.append('    ' + draw_star(225, -4, 2.0, "#C084FC"))
     
     svg.append('    <rect x="243" y="-11" width="14" height="14" rx="3" fill="#161b22" />')
-    svg.append('    ' + draw_star(250, -4, 3.5, "#C084FC"))
+    svg.append('    ' + draw_star(250, -4, 2.8, "#C084FC"))
     
     svg.append('    <rect x="268" y="-11" width="14" height="14" rx="3" fill="#161b22" />')
-    svg.append('    ' + draw_star(275, -4, 4.0, "#C084FC"))
+    svg.append('    ' + draw_star(275, -4, 3.4, "#C084FC"))
     
     svg.append('    <rect x="293" y="-11" width="14" height="14" rx="3" fill="#161b22" />')
-    svg.append('    ' + draw_star(300, -4, 4.5 * 1.4, "#A855F7", 0.4))
-    svg.append('    ' + draw_star(300, -4, 4.5, "#C084FC"))
-    svg.append('    ' + draw_star(300, -4, 2.0, "#F3E8FF"))
+    svg.append('    ' + draw_star(300, -4, 3.8 * 1.5, "#A855F7", 0.4))
+    svg.append('    ' + draw_star(300, -4, 3.8, "#C084FC"))
+    svg.append('    ' + draw_star(300, -4, 1.7, "#F3E8FF"))
     
     svg.append('    <text x="320" y="0" fill="#8b949e" font-size="12">More</text>')
     svg.append('  </g>')
@@ -198,14 +198,14 @@ def generate_svg(calendar_data, filepath, width=1200, height=600):
         cy = cell["y"] + cell_size / 2
         count = cell["count"]
         
-        # Star size logic based on count (max radius 4.5 ensures it remains completely inside 14x14 cell)
-        if count <= 2: r = 2.5
-        elif count <= 5: r = 3.5
-        elif count <= 10: r = 4.0
-        else: r = 4.5
+        # Star size logic based on count (max radius 3.8 ensures it remains <= 55% of 14x14 cell)
+        if count <= 2: r = 2.0
+        elif count <= 5: r = 2.8
+        elif count <= 10: r = 3.4
+        else: r = 3.8
         
         # Glow (a larger, softer star shape, strictly bound inside the cell)
-        glow_r = r * 1.4
+        glow_r = r * 1.5
         svg.append('    ' + draw_star(cx, cy, glow_r, "#A855F7", 0.4))
         
         # Star Main Shape

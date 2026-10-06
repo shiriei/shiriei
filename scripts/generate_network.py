@@ -145,7 +145,7 @@ def generate_svg(calendar_data, filepath, width=1200, height=600):
     ]
     
     # Title & Subtitle
-    svg.append('  <text x="100" y="60" fill="#c9d1d9" font-size="28" font-weight="bold">Contribution Constellation</text>')
+    svg.append('  <text x="100" y="60" fill="#D8B4FE" font-size="32" font-weight="bold">Contribution Constellation</text>')
     svg.append('  <text x="100" y="90" fill="#8b949e" font-size="16">GitHub activity &#8226; Last 12 months</text>')
     
     # Legend

@@ -58,6 +58,10 @@ def fetch_contributions(username, token):
         print(f"Network Error: {e.reason}")
         return None
 
+def draw_star(cx, cy, r, opacity=1.0):
+    # Generates an elegant 4-point sparkle using SVG Bezier curves (Q)
+    return f'<path d="M {cx:.1f} {cy-r:.1f} Q {cx:.1f} {cy:.1f} {cx+r:.1f} {cy:.1f} Q {cx:.1f} {cy:.1f} {cx:.1f} {cy+r:.1f} Q {cx:.1f} {cy:.1f} {cx-r:.1f} {cy:.1f} Q {cx:.1f} {cy:.1f} {cx:.1f} {cy-r:.1f} Z" fill="#39FFDF" fill-opacity="{opacity:.2f}" />'
+
 def generate_svg(calendar_data, filepath, width=1200, height=600):
     try:
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
@@ -106,19 +110,18 @@ def generate_svg(calendar_data, filepath, width=1200, height=600):
         except ValueError:
             most_active_month = best_month_str
 
-    # Prepare nodes
+    # Prepare nodes for active contribution stars
     active_nodes = []
-    inactive_nodes = []
     month_labels = []
     last_month = None
     
     total_days = len(all_days)
     for i, d in enumerate(all_days):
         x = 100 + (i / max(1, total_days - 1)) * 1000
-        # Wavy chronological timeline that occupies vertical space (170 to 450)
-        y = 310 + math.sin(i / 15.0) * 100 + math.cos(i / 7.0) * 40
+        # Underlying timeline base for vertical scattering
+        base_y = 260 + math.sin(i / 15.0) * 80 + math.cos(i / 7.0) * 30
         
-        # Add month label
+        # Record month label positions
         month_str = d["date"][5:7]
         if month_str != last_month:
             try:
@@ -131,99 +134,116 @@ def generate_svg(calendar_data, filepath, width=1200, height=600):
             last_month = month_str
             
         if d["count"] > 0:
+            # Find a safe vertical position to prevent star overlap
+            lane_offsets = [0, 50, -50, 100, -100, 150, -150]
+            safe_y = base_y
+            for offset in lane_offsets:
+                test_y = base_y + offset
+                overlap = False
+                for p in reversed(active_nodes[-15:]):
+                    dx = abs(p["x"] - x)
+                    dy = abs(p["y"] - test_y)
+                    # Vertical separation needed for text labels
+                    if dx < 40 and dy < 60:
+                        overlap = True
+                        break
+                if not overlap:
+                    safe_y = test_y
+                    break
+                    
             active_nodes.append({
                 "index": i,
                 "x": x,
-                "y": y,
+                "y": safe_y,
                 "count": d["count"],
                 "date": d["date"]
             })
-        else:
-            inactive_nodes.append({
-                "x": x,
-                "y": y
-            })
 
-    # Prepare edges (thin lines between chronologically active days)
-    edges = []
-    for i in range(len(active_nodes)):
-        idx_current = active_nodes[i]["index"]
-        # Connect to the next active day chronologically
-        if i + 1 < len(active_nodes):
-            edges.append((i, i + 1))
-            
-        # Add one sparse secondary connection if it's very close in time to maintain visual continuity
-        if i + 2 < len(active_nodes):
-            idx_target = active_nodes[i+2]["index"]
-            if (idx_target - idx_current) <= 7:
-                edges.append((i, i + 2))
+    # Prepare deterministic decorative background stars
+    background_stars = []
+    for i in range(70):
+        # Pseudo-random but deterministic properties
+        bx = 50 + ((i * 137) % 1100)
+        by = 120 + ((i * 93) % 300)
+        br = 0.5 + ((i * 17) % 2)
+        opacity = 0.05 + ((i * 11) % 20) / 100.0
+        background_stars.append(f'<circle cx="{bx:.1f}" cy="{by:.1f}" r="{br:.1f}" fill="#39FFDF" fill-opacity="{opacity:.2f}"/>')
 
     # Build SVG
     svg = [
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">',
         '  <style>',
-        '    .node { transition: all 0.3s ease; }',
-        '    .node:hover { stroke: #ffffff; stroke-width: 2px; }',
         '    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }',
         '  </style>',
         f'  <rect width="{width}" height="{height}" fill="#0d1117" rx="15" />'
     ]
     
-    # Title
-    svg.append('  <text x="100" y="60" fill="#c9d1d9" font-size="28" font-weight="bold">Contribution Network</text>')
+    # Title & Subtitle
+    svg.append('  <text x="100" y="60" fill="#c9d1d9" font-size="28" font-weight="bold">Contribution Constellation</text>')
     svg.append('  <text x="100" y="90" fill="#8b949e" font-size="16">GitHub activity &#8226; Last 12 months</text>')
     
     # Legend
     svg.append('  <g transform="translate(800, 70)">')
     svg.append('    <text x="0" y="0" fill="#8b949e" font-size="14">Contribution intensity</text>')
     svg.append('    <text x="160" y="0" fill="#8b949e" font-size="12">Less</text>')
-    svg.append('    <circle cx="200" cy="-4" r="5" fill="#FF9BCE" fill-opacity="0.4"/>')
-    svg.append('    <circle cx="225" cy="-4" r="6.5" fill="#FF9BCE" fill-opacity="0.6"/>')
-    svg.append('    <circle cx="250" cy="-4" r="8" fill="#FF9BCE" fill-opacity="0.8"/>')
-    svg.append('    <circle cx="275" cy="-4" r="10" fill="#FF9BCE" fill-opacity="1.0"/>')
-    svg.append('    <text x="300" y="0" fill="#8b949e" font-size="12">More</text>')
+    svg.append('    <circle cx="200" cy="-4" r="2" fill="#39FFDF" fill-opacity="0.3"/>')
+    svg.append('    ' + draw_star(225, -4, 4, 0.5))
+    svg.append('    ' + draw_star(250, -4, 6, 0.7))
+    svg.append('    ' + draw_star(275, -4, 8, 0.9))
+    svg.append('    ' + draw_star(300, -4, 10, 1.0))
+    svg.append('    <text x="320" y="0" fill="#8b949e" font-size="12">More</text>')
+    svg.append('  </g>')
+
+    # Decorative Background
+    svg.append('  <g id="background-stars">')
+    for star_str in background_stars:
+        svg.append(f'    {star_str}')
     svg.append('  </g>')
     
-    # Month Labels
+    # Month Timeline (Subtle timeline at bottom)
+    svg.append('  <g id="timeline">')
+    svg.append('    <line x1="100" y1="440" x2="1100" y2="440" stroke="#30363d" stroke-width="1" />')
     for m in month_labels:
-        svg.append(f'  <text x="{m["x"]:.1f}" y="130" fill="#8b949e" font-size="12" text-anchor="middle">{m["label"]}</text>')
-
-    # Inactive Nodes (subtle background dots)
-    svg.append('  <g id="inactive-nodes">')
-    for n in inactive_nodes:
-        svg.append(f'    <circle cx="{n["x"]:.1f}" cy="{n["y"]:.1f}" r="1.5" fill="#30363d" />')
+        svg.append(f'  <text x="{m["x"]:.1f}" y="458" fill="#8b949e" font-size="12" text-anchor="middle">{m["label"]}</text>')
     svg.append('  </g>')
 
-    # Network Edges
-    svg.append('  <g id="edges">')
-    for u_idx, v_idx in edges:
-        u = active_nodes[u_idx]
-        v = active_nodes[v_idx]
-        svg.append(f'    <line x1="{u["x"]:.1f}" y1="{u["y"]:.1f}" x2="{v["x"]:.1f}" y2="{v["y"]:.1f}" stroke="#FF9BCE" stroke-width="1.5" stroke-opacity="0.25" />')
-    svg.append('  </g>')
-
-    # Network Nodes
-    svg.append('  <g id="active-nodes">')
+    # Primary Contribution Stars
+    svg.append('  <g id="contribution-stars">')
     for n in active_nodes:
-        r = 5.0 + math.log1p(n["count"]) * 3.0
-        opacity = min(1.0, 0.4 + math.log1p(n["count"]) * 0.2)
+        count = n["count"]
         
-        # Draw node
-        svg.append(f'    <circle class="node" cx="{n["x"]:.1f}" cy="{n["y"]:.1f}" r="{r:.1f}" fill="#FF9BCE" fill-opacity="{opacity:.2f}"></circle>')
+        # Scaling logic: smaller stars for 1-5, escalating rapidly for 11+
+        if count <= 2:
+            r = 5.0 + count * 0.5
+        elif count <= 5:
+            r = 7.0 + (count - 2) * 1.0
+        elif count <= 10:
+            r = 10.0 + (count - 5) * 1.0
+        else:
+            r = 15.0 + math.log1p(count - 10) * 3.0
+            
+        opacity = min(1.0, 0.4 + math.log1p(count) * 0.2)
+        glow_r = r * 1.6
         
-        # Text label for count
-        svg.append(f'    <text x="{n["x"]:.1f}" y="{n["y"] - r - 4:.1f}" fill="#ffffff" font-size="12" font-weight="bold" text-anchor="middle">{n["count"]}</text>')
+        # Subtle radial glow behind the star
+        svg.append(f'    <circle cx="{n["x"]:.1f}" cy="{n["y"]:.1f}" r="{glow_r:.1f}" fill="#39FFDF" fill-opacity="{opacity * 0.15:.2f}"/>')
         
-        # Text label for date
+        # The star shape itself
+        svg.append('    ' + draw_star(n["x"], n["y"], r, opacity))
+        
+        # Text label for exact contribution count
+        svg.append(f'    <text x="{n["x"]:.1f}" y="{n["y"] - r - 6:.1f}" fill="#ffffff" font-size="12" font-weight="bold" text-anchor="middle">{count}</text>')
+        
+        # Text label for exact date
         try:
             dt = datetime.strptime(n["date"], "%Y-%m-%d")
             date_str = dt.strftime("%b %d")
         except ValueError:
             date_str = n["date"][5:]
-        svg.append(f'    <text x="{n["x"]:.1f}" y="{n["y"] + r + 12:.1f}" fill="#8b949e" font-size="10" text-anchor="middle">{date_str}</text>')
+        svg.append(f'    <text x="{n["x"]:.1f}" y="{n["y"] + r + 14:.1f}" fill="#8b949e" font-size="10" text-anchor="middle">{date_str}</text>')
     svg.append('  </g>')
 
-    # Summary Statistics
+    # Summary Statistics Cards
     stats_y = 480
     card_width = 220
     card_height = 80
@@ -239,7 +259,8 @@ def generate_svg(calendar_data, filepath, width=1200, height=600):
         cx = 100 + idx * (card_width + spacing)
         svg.append(f'  <rect x="{cx}" y="{stats_y}" width="{card_width}" height="{card_height}" rx="8" fill="#161b22" stroke="#30363d"/>')
         svg.append(f'  <text x="{cx + card_width/2}" y="{stats_y + 30}" fill="#8b949e" font-size="14" text-anchor="middle">{title}</text>')
-        svg.append(f'  <text x="{cx + card_width/2}" y="{stats_y + 60}" fill="#FF9BCE" font-size="22" font-weight="bold" text-anchor="middle">{value}</text>')
+        # Teal accent color instead of pink
+        svg.append(f'  <text x="{cx + card_width/2}" y="{stats_y + 60}" fill="#39FFDF" font-size="22" font-weight="bold" text-anchor="middle">{value}</text>')
 
     svg.append('</svg>')
     

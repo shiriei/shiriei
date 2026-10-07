@@ -90,15 +90,9 @@ Linux, and web technologies**, while gradually diving deeper into
   <img width="100%" src="https://fabianocouto-activity-graph.vercel.app/graph/?username=shiriei&bg_color=00000000&color=2ea043&line=2ea043&point=c9d1d9&area=true&hide_border=true" alt="Contribution Graph" />
 </p>
 
-### 🌐 Contribution Network
+### 🛹 Leaving Little Traces
 
-<p align="center">
-  <img
-    src="https://github.com/shiriei/shiriei/raw/refs/heads/output/contribution-network.svg"
-    width="100%"
-    alt="GitHub Contribution Network"
-  />
-</p>
+![GitHub Contribution Snake](https://github.com/shiriei/shiriei/blob/output/github-contribution-grid-snake-dark.svg)
 
 ---
 <p align="center"><i>⭐️ From <a href="https://github.com/shiriei">ISHA GAUTAM(shiriei)</a></i></p>
